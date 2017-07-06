@@ -31,7 +31,7 @@ activityName = 'Extract Genesets';
 activityDescription = 'Extract genesets from enrichr';
 
 # Github link
-thisRepo <- getRepo(repository = "th1vairam/Brain_Reg_Net", ref="branch", refName='geneSetCuration')
+thisRepo <- getRepo(repository = "blogsdon/Brain_Reg_Net", ref="branch", refName='geneSetCuration')
 thisFile <- getPermlink(repository = thisRepo, repositoryPath='code/R/extractGeneSets.R')
 
 #### Query Synapse for source files ####
@@ -39,19 +39,23 @@ all.files = synQuery('select id,name from file where parentId == "syn4598359"')
 
 GeneSets = plyr::dlply(all.files, .(file.id), .fun = function(y){
   print(paste('Started',y$file.name))
-  tmp = read.table(synGet(y$file.id)@filePath, fill = NA, row.names = NULL, header = FALSE, sep = '\t')
-  tmp1 = plyr::dlply(tmp, .(V1), .fun = function(x){
-    sapply(x[-(1)], function(x){
-      str_split(x, ',')[[1]][1]
-    }) %>% 
-      unique() %>% 
-      setdiff('')
-  }, 
-  .parallel = F,
-  .paropts = list(.packages = c('dplyr')))
+  tmp = readLines(synGet(y$file.id)@filePath)
+  
+  internal <- function(x){
+      tmp2 = strsplit(x,'\t')[[1]]
+      tmp3 = tmp2[-c(1:2)]
+      set1 = list()
+      set1$genes <- tmp3
+      set1$name <- tmp2[1]
+      return(set1)
+  }
+  tmp1 = lapply(tmp,internal)
+  tmp2 = lapply(tmp1,function(x) x$genes)
+  tmp3 = lapply(tmp1,function(x) x$name)
+  names(tmp2) <- tmp3
   print(paste('Completed',y$file.name))
-  return(tmp1)
- }, .progress = 'text')
+  return(tmp2)
+}, .progress = 'text')
 names(GeneSets) = gsub('.txt','',all.files$file.name)
 save(list = 'GeneSets', file = 'allEnrichrGeneSets.RData')
 stopCluster(cl)
